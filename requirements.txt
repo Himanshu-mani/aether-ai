@@ -1,0 +1,16 @@
+crawl4ai==0.8.6
+fastapi
+fpdf
+langchain-core
+langchain-ollama
+langchain-community
+langchain-text-splitters
+pydantic
+python-docx
+uvicorn
+chromadb
+pypdf
+docx2txt
+unstructured
+pandas
+python-multipart
