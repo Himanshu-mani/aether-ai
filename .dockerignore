@@ -1,0 +1,12 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+.env
+workspace/uploads/*
+workspace/downloads/*
+workspace/chromadb_store/*
+!workspace/uploads/.gitkeep
+!workspace/downloads/.gitkeep
+!workspace/chromadb_store/.gitkeep

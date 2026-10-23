@@ -1,21 +1,30 @@
-crawl4ai==0.8.6
+# Web API and validation
 fastapi
-fpdf
-playwright
+uvicorn[standard]
+python-multipart
+pydantic
+python-dotenv
+
+# Local LLM, retrieval, and vector storage
 langchain
 langchain-core
 langchain-ollama
 langchain-community
 langchain-text-splitters
-pydantic
-python-docx
-uvicorn
 chromadb
+
+# Document parsing and output
 pypdf
+python-docx
 docx2txt
+fpdf2
 unstructured
 pandas
 openpyxl
 xlrd
-python-multipart
+
+# Web retrieval and benchmark client
+crawl4ai==0.8.6
+playwright
 requests
+psutil

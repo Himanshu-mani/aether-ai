@@ -1,1 +1,0 @@
-Final verification is documented in FINAL_TEST_REPORT.md.

@@ -1,74 +1,53 @@
-# Aether AI — Final Test Report
+# AetherAI — Verification and Benchmark Report
 
-## Verification status
+## Current code checks
 
-The following application features were verified in the earlier full test run. The additional Gemma 2:2B inference measurement below is a separate benchmark run and does not replace those feature tests.
+The following checks were run against the revised source tree in this workspace:
 
-| Feature | Status | Evidence |
+| Check | Result | Notes |
 |---|---|---|
-| Concurrent Web Scraping | PASS | Two real public URLs completed concurrently in 1.342 s; successful results were combined and a failed URL was isolated. |
-| Crawl4AI + Playwright | PASS | Chromium launched successfully and Crawl4AI fetched Example Domain. |
-| Real SSE Streaming | PASS | Live /api/chat returned 200 with text/event-stream; real chunks were received and reconstructed without the async-generator error. |
-| Frontend Streaming | PASS | Real Chromium browser test received /api/chat and rendered assistant text with no console errors. |
-| Resource-Aware Inference | PASS | RAM/GPU/VRAM were measured and the no-GPU fallback executed safely. |
-| Reproducible Inference Benchmark (Gemma 4 E4B baseline) | PASS | Earlier measured baseline: 314 generated tokens, 16.9733 s evaluation, 18.50 tokens/sec, 17.5819 s total. |
-| Gemma 4 E4B baseline | PASS | Earlier test configuration and Ollama runtime used gemma4:e4b. |
-| nomic-embed-text | PASS | Embedding model was installed and direct embedding/upload tests succeeded. |
-| ChromaDB / Hybrid RAG | PASS | 11 CSV chunks were stored/retrieved and FILE, SCRAPE, and DIRECT routes produced responses. |
-| FastAPI / API | PASS | App startup and required API routes were exercised; upload and SSE returned expected results. |
-| Error Handling | PASS | Invalid URL, failed URL, invalid payload, Ollama failure, GPU fallback, and alternate upload were handled without application crash. |
+| Python syntax compilation | PASS | python -m compileall -q main.py agent api core tools benchmarks tests completed successfully. |
+| Resource profile unit tests | PASS | 3 tests cover low RAM, high RAM, and low free VRAM behavior. |
+| Frontend JavaScript syntax | PASS | node --check frontend/script.js completed successfully. |
+| Stale model/tool reference scan | PASS | No gemma4:e4b, Gemma 4 E4B, or nonexistent quick_web_search references found in the revised working tree. |
+| Full dependency installation | NOT RUN | Several project dependencies are not installed in the current environment. |
+| FastAPI + Ollama end-to-end chat | NOT RUN | Requires the full dependency set and a running Ollama server with the configured model. |
+| Document upload + embedding + Chroma retrieval | NOT RUN | Requires LangChain/Chroma dependencies and the nomic-embed-text model. |
+| Crawl4AI live-web integration | NOT RUN | Requires Crawl4AI, Playwright Chromium, and network access. |
+| Docker image build | NOT RUN | Docker build was not available in this verification pass. |
 
-## Latest inference benchmark — Gemma 2:2B
+## Historical Gemma 2:2B inference snapshot
 
-Measured on 2026-10-23 using the streaming benchmark script and Ollama.
+A previously recorded run on 2026-10-23 used the Ollama streaming generation API and a 256-token generation cap. It is retained here as historical benchmark evidence; it is not a test of every revised application path.
 
-| Metric | Result |
+| Metric | Recorded value |
 |---|---:|
 | Model | gemma2:2b |
 | Prompt tokens | 38 |
 | Generated tokens | 256 (configured output cap reached) |
 | Generated words | 199 |
-| Time to first non-empty streaming chunk (client-measured TTFT) | 2.4607 s (2460.74 ms) |
+| Client-measured time to first non-empty chunk | 2.4607 s (2460.74 ms) |
 | Prompt evaluation duration | 0.3641 s |
 | Generation duration | 4.7714 s |
-| Generation throughput | 53.65 tokens/sec |
+| Generation throughput | 53.65 tokens/s |
 | Ollama server total duration | 5.1636 s |
 | Client total duration | 7.2391 s |
-| GPU placement | 100% GPU reported by ollama ps |
+| GPU placement reported by ollama ps | 100% GPU |
 | GPU | NVIDIA GeForce RTX 2050 |
 | Total VRAM | 4096 MB |
 | Reported used / free VRAM | 2135 MB / 1830 MB |
 
-### Interpretation and caveats
+## Interpretation and limitations
 
-- TTFT is measured from the start of the client request until the first non-empty streaming response chunk. It includes request and model-startup overhead; it is not a pure GPU-compute latency.
-- Ollama reported 100% GPU for the loaded gemma2:2b model in this run.
-- The benchmark requested at most 256 generated tokens and the model reached that cap. The captured answer therefore ends mid-response; this is a benchmark output limit, not evidence that a normal chat response will always be truncated.
-- Client total time includes streaming/request overhead and is expected to exceed Ollama's server-reported total duration.
+- The model reached the 256-token generation cap, so the benchmark output ended mid-response.
+- Client-measured time to first token includes request and client overhead; it is not a pure model-compute latency.
+- Hardware results are machine-specific and are not general performance guarantees.
+- Earlier integration checks were recorded before the current code review. Re-run integration tests against this revision before claiming the entire application passes end-to-end.
 
-## Earlier Gemma 4 E4B baseline
+## Running checks locally
 
-- Prompt tokens: 34
-- Generated tokens: 314
-- Evaluation duration: 16.9733 s
-- Generation throughput: 18.50 tokens/sec
-- Total duration: 17.5819 s
-- Prompt evaluation duration: 0.1409 s
+    python -m unittest discover -s tests -v
+    python -m compileall -q main.py agent api core tools benchmarks tests
+    node --check frontend/script.js
 
-The Gemma 4 E4B baseline and Gemma 2:2B measurement are separate runs using different prompts and output lengths; compare them as measured runs, not as a controlled apples-to-apples model evaluation.
-
-## Resource-aware runtime
-
-The earlier full test measured system RAM, available RAM, GPU availability, GPU model, total/free/used VRAM, and selected a low-memory profile when appropriate. A simulated missing-GPU environment also completed safely without crashing.
-
-## Test environment
-
-- OS reported by resource summary: Linux
-- GPU: NVIDIA GeForce RTX 2050, 4096 MB VRAM
-- Ollama endpoint: http://localhost:11434
-- Embedding model: nomic-embed-text
-- Crawl4AI: 0.8.6
-
-## Notes
-
-Benchmark values are measured runtime output, not hard-coded performance claims. Repeat benchmarks with the same model, prompt, output cap, and runtime conditions for meaningful comparisons.
+For the full feature path, install requirements.txt, install Playwright Chromium, pull gemma2:2b and nomic-embed-text in Ollama, then run the app and test chat, upload/retrieval, web retrieval, and file generation separately.

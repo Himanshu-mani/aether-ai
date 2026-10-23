@@ -1,48 +1,55 @@
+"""Safe file search and downloadable document creation."""
+
 import os
-from fpdf import FPDF
+import re
+from pathlib import Path
+
 import docx
-from langchain.tools import tool
-from core.config import DOWNLOADS_DIR
+from fpdf import FPDF
+from langchain_core.tools import tool
+
+from core.config import ALLOWED_DOWNLOAD_EXTENSIONS, DOWNLOADS_DIR
 from core.rag_pipeline import query_documents
+
+
+def _safe_filename(filename: str) -> str:
+    name = re.split(r"[/\\\\]", filename or "")[-1].strip()
+    name = re.sub(r"[^A-Za-z0-9._ -]", "_", name).strip(" .")
+    if not name or name in {".", ".."}:
+        raise ValueError("A valid filename is required.")
+    if Path(name).suffix.lower() not in ALLOWED_DOWNLOAD_EXTENSIONS:
+        raise ValueError(f"Unsupported output type. Allowed: {', '.join(sorted(ALLOWED_DOWNLOAD_EXTENSIONS))}")
+    return name[:180]
+
 
 @tool
 def search_uploaded_files(query: str) -> str:
-    """Use this to search for information INSIDE the files uploaded by the user.
-    Input should be the exact question you want to ask the documents."""
-    try:
-        # Fetches data directly from ChromaDB (rag_pipeline)
-        return query_documents(query)
-    except Exception as e:
-        return f"Error searching files: {str(e)}"
+    """Search text from documents uploaded to the local workspace."""
+    return query_documents(query)
+
 
 @tool
 def create_downloadable_file(filename: str, content: str) -> str:
-    """Use this to create a file (PDF, CSV, TXT, DOCX, PY) with the generated content.
-    Input MUST be filename (e.g., report.pdf, data.csv) and the full content.
-    DO NOT output the content in the chat, ONLY provide the final download link."""
-    
-    os.makedirs(DOWNLOADS_DIR, exist_ok=True)
-    file_path = os.path.join(DOWNLOADS_DIR, filename)
-    ext = filename.split('.')[-1].lower()
-    
+    """Create a downloadable PDF, DOCX, CSV, TXT, Markdown, JSON, or code file."""
     try:
-        if ext == 'pdf':
+        filename = _safe_filename(filename)
+        os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+        file_path = Path(DOWNLOADS_DIR) / filename
+        extension = file_path.suffix.lower()
+        if extension == ".pdf":
             pdf = FPDF()
+            pdf.set_auto_page_break(auto=True, margin=15)
             pdf.add_page()
             pdf.set_font("Arial", size=11)
-            encoded_content = content.encode('latin-1', 'replace').decode('latin-1')
-            pdf.multi_cell(0, 10, txt=encoded_content)
-            pdf.output(file_path)
-        elif ext == 'docx':
-            doc = docx.Document()
-            doc.add_paragraph(content)
-            doc.save(file_path)
-        else: # TXT, CSV, PY, JS
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(content)
-                
-        download_url = f"http://localhost:8000/downloads/{filename}"
-        return f"File created successfully. Tell user EXACTLY: Your file is ready. Download it here: {download_url}"
-        
-    except Exception as e:
-        return f"Error creating file: {str(e)}"
+            pdf.multi_cell(0, 7, text=content.encode("latin-1", "replace").decode("latin-1"))
+            pdf.output(str(file_path))
+        elif extension == ".docx":
+            document = docx.Document()
+            for paragraph in content.splitlines() or [""]:
+                document.add_paragraph(paragraph)
+            document.save(str(file_path))
+        else:
+            file_path.write_text(content, encoding="utf-8", newline="")
+        return f"File created successfully. Download it here: /downloads/{filename}"
+    except Exception as exc:
+        return f"Error creating file: {exc}"

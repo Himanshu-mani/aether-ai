@@ -1,1 +1,0 @@
-See docs/FINAL_TEST_REPORT.md for the final verification record.

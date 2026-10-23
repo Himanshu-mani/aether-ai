@@ -1,55 +1,64 @@
-import os
-# Loaders for reading different types of files
-from langchain_community.document_loaders import PyPDFLoader, Docx2txtLoader, CSVLoader, UnstructuredExcelLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+"""Document ingestion and retrieval backed by ChromaDB."""
+
+from pathlib import Path
+
+from langchain_community.document_loaders import (
+    CSVLoader, Docx2txtLoader, PyPDFLoader, TextLoader, UnstructuredExcelLoader,
+)
 from langchain_community.vectorstores import Chroma
-from core.llm_setup import get_embeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from core.config import CHROMA_DIR
+from core.llm_setup import get_embeddings
 
-def process_and_store_document(file_path: str):
-    """Reads the file, splits it into chunks, and saves it to ChromaDB."""
-    ext = file_path.split('.')[-1].lower()
-    
-    # Select the appropriate loader based on the file extension
-    if ext == 'pdf':
-        loader = PyPDFLoader(file_path)
-    elif ext == 'docx':
-        loader = Docx2txtLoader(file_path)
-    elif ext == 'csv':
-        loader = CSVLoader(file_path)
-    elif ext in ['xlsx', 'xls']:
-        loader = UnstructuredExcelLoader(file_path)
-    else: # txt, py, md, json etc.
-        loader = TextLoader(file_path, encoding='utf-8')
-        
+
+def _loader_for(path: Path):
+    extension = path.suffix.lower()
+    if extension == ".pdf":
+        return PyPDFLoader(str(path))
+    if extension == ".docx":
+        return Docx2txtLoader(str(path))
+    if extension == ".csv":
+        return CSVLoader(str(path), autodetect_encoding=True)
+    if extension in {".xlsx", ".xls"}:
+        return UnstructuredExcelLoader(str(path))
+    if extension in {".txt", ".md", ".json", ".py"}:
+        return TextLoader(str(path), encoding="utf-8", autodetect_encoding=True)
+    raise ValueError(f"Unsupported file type: {extension or '(no extension)'}")
+
+
+def process_and_store_document(file_path: str) -> str:
+    """Load a supported file, split it, and append its chunks to the vector store."""
+    path = Path(file_path)
     try:
-        docs = loader.load()
-    except Exception as e:
-        return f"Error loading file: {e}"
+        docs = _loader_for(path).load()
+        if not docs or not any(doc.page_content.strip() for doc in docs):
+            return "Error loading file: no readable text was found in this document."
+        for doc in docs:
+            doc.metadata.setdefault("source", path.name)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        splits = splitter.split_documents(docs)
+        if not splits:
+            return "Error loading file: document did not contain any indexable text."
+        store = Chroma(persist_directory=CHROMA_DIR, embedding_function=get_embeddings())
+        store.add_documents(splits)
+        return f"Success! Indexed {len(splits)} chunks from {path.name}."
+    except Exception as exc:
+        return f"Error processing file: {exc}"
 
-    # Chunking: Split large files into 1000 character chunks to prevent LLM overload
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    splits = text_splitter.split_documents(docs)
 
-    # Save to ChromaDB using Nomic-embed-text
-    embeddings = get_embeddings()
-    vectorstore = Chroma.from_documents(documents=splits, embedding=embeddings, persist_directory=CHROMA_DIR)
-    
-    return f"Success! Created {len(splits)} chunks of the file and saved them to memory."
-
-def query_documents(query: str, k: int = 3):
-    """Searches ChromaDB to retrieve the most relevant text."""
-    if not os.path.exists(CHROMA_DIR):
-        return "Memory is empty. Please upload a file first."
-        
-    embeddings = get_embeddings()
-    vectorstore = Chroma(persist_directory=CHROMA_DIR, embedding_function=embeddings)
-    
-    # Retrieves the top 3 chunks matching the question
-    results = vectorstore.similarity_search(query, k=k)
-    
+def query_documents(query: str, k: int = 3) -> str:
+    """Return the most relevant document chunks, or a clear empty-state message."""
+    if not Path(CHROMA_DIR).exists() or not any(item.name != ".gitkeep" for item in Path(CHROMA_DIR).iterdir()):
+        return "No documents have been indexed yet. Upload a file first."
+    try:
+        store = Chroma(persist_directory=CHROMA_DIR, embedding_function=get_embeddings())
+        results = store.similarity_search(query, k=max(1, min(int(k), 10)))
+    except Exception as exc:
+        return f"Document search failed: {exc}"
     if not results:
-        return "The answer to this question was not found in the file."
-        
-    context = "\n\n".join([doc.page_content for doc in results])
-    return context
+        return "No relevant text was found in the indexed documents."
+    return "\n\n---\n\n".join(
+        f"Source: {doc.metadata.get('source', 'uploaded document')}\n{doc.page_content}"
+        for doc in results
+    )
