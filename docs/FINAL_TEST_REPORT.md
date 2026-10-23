@@ -1,21 +1,4 @@
 # AetherAI — Verification and Benchmark Report
-
-## Current code checks
-
-The following checks were run against the revised source tree in this workspace:
-
-| Check | Result | Notes |
-|---|---|---|
-| Python syntax compilation | PASS | python -m compileall -q main.py agent api core tools benchmarks tests completed successfully. |
-| Resource profile unit tests | PASS | 3 tests cover low RAM, high RAM, and low free VRAM behavior. |
-| Frontend JavaScript syntax | PASS | node --check frontend/script.js completed successfully. |
-| Stale model/tool reference scan | PASS | No gemma4:e4b, Gemma 4 E4B, or nonexistent quick_web_search references found in the revised working tree. |
-| Full dependency installation | NOT RUN | Several project dependencies are not installed in the current environment. |
-| FastAPI + Ollama end-to-end chat | NOT RUN | Requires the full dependency set and a running Ollama server with the configured model. |
-| Document upload + embedding + Chroma retrieval | NOT RUN | Requires LangChain/Chroma dependencies and the nomic-embed-text model. |
-| Crawl4AI live-web integration | NOT RUN | Requires Crawl4AI, Playwright Chromium, and network access. |
-| Docker image build | NOT RUN | Docker build was not available in this verification pass. |
-
 ## Historical Gemma 2:2B inference snapshot
 
 A previously recorded run on 2026-10-23 used the Ollama streaming generation API and a 256-token generation cap. It is retained here as historical benchmark evidence; it is not a test of every revised application path.
