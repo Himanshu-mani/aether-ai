@@ -1,6 +1,6 @@
 import unittest
 
-from core.resource_manager import infer_local_inference_profile
+from app.monitoring.resource_manager import infer_local_inference_profile
 
 
 class ResourceProfileTests(unittest.TestCase):

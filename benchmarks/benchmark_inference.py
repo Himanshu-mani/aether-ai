@@ -6,8 +6,8 @@ from typing import Any, Dict
 
 import requests
 
-from core.config import MODEL_NAME, OLLAMA_BASE_URL
-from core.resource_manager import build_resource_summary
+from app.core.config import MODEL_NAME, OLLAMA_BASE_URL
+from app.monitoring.resource_manager import build_resource_summary
 
 
 def run_benchmark(prompt: str) -> Dict[str, Any]:
